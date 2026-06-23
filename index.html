@@ -1243,7 +1243,17 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:36px 20px}
   <div class="addr-modal" role="dialog" aria-modal="true" aria-labelledby="addrModalTitle">
     <div class="addr-modal-icon">📍</div>
     <h2 id="addrModalTitle">Where should we deliver?</h2>
-    <p>Enter your delivery address to see the menu and place your order. We'll remember it for next time.</p>
+    <p>Enter your full name and delivery address so we can get your order to the right place.</p>
+    <input
+      class="addr-modal-input"
+      id="nameInput"
+      type="text"
+      placeholder="Full Name (e.g., Ahmed Khan)"
+      autocomplete="name"
+      onkeydown="if(event.key==='Enter') document.getElementById('addrInput').focus()"
+      style="margin-bottom:10px"
+    />
+    <div class="addr-modal-err" id="nameErr">Please enter your full name.</div>
     <input
       class="addr-modal-input"
       id="addrInput"
@@ -1255,9 +1265,9 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:36px 20px}
     <div class="addr-modal-err" id="addrErr">Please enter a valid delivery address.</div>
     <button class="addr-modal-btn" onclick="confirmAddress()">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      Confirm Delivery Address
+      Confirm Details
     </button>
-    <p class="addr-modal-note">🔒 Your address is stored locally on your device only.</p>
+    <p class="addr-modal-note">🔒 Your details are stored locally on your device only.</p>
   </div>
 </div>
 
@@ -1311,17 +1321,19 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:36px 20px}
 /* ── State ── */
 let cart = {};
 let deliveryAddress = '';
+let customerName = '';
 
 /* ── Address Modal ── */
-const ADDR_KEY = 'ub_delivery_address';
+const ADDR_KEY  = 'ub_delivery_address';
+const NAME_KEY  = 'ub_customer_name';
 
 function openAddrModal(){
   const overlay = document.getElementById('addrModalOverlay');
   overlay.classList.add('open');
-  // Pre-fill with existing address if any
-  const inp = document.getElementById('addrInput');
-  if(deliveryAddress) inp.value = deliveryAddress;
-  setTimeout(() => inp.focus(), 380);
+  // Pre-fill with existing values
+  if(customerName)  document.getElementById('nameInput').value = customerName;
+  if(deliveryAddress) document.getElementById('addrInput').value = deliveryAddress;
+  setTimeout(() => document.getElementById('nameInput').focus(), 380);
 }
 
 function closeAddrModal(){
@@ -1329,17 +1341,31 @@ function closeAddrModal(){
 }
 
 function confirmAddress(){
-  const inp = document.getElementById('addrInput');
-  const err = document.getElementById('addrErr');
-  const val = inp.value.trim();
-  if(val.length < 5){
-    err.classList.add('show');
-    inp.focus();
-    return;
+  const nameInp = document.getElementById('nameInput');
+  const nameErr = document.getElementById('nameErr');
+  const addrInp = document.getElementById('addrInput');
+  const addrErr = document.getElementById('addrErr');
+
+  const nameVal = nameInp.value.trim();
+  const addrVal = addrInp.value.trim();
+  let valid = true;
+
+  if(nameVal.length < 2){
+    nameErr.classList.add('show'); nameInp.focus(); valid = false;
+  } else {
+    nameErr.classList.remove('show');
   }
-  err.classList.remove('show');
-  deliveryAddress = val;
-  localStorage.setItem(ADDR_KEY, val);
+  if(addrVal.length < 5){
+    addrErr.classList.add('show'); if(valid) addrInp.focus(); valid = false;
+  } else {
+    addrErr.classList.remove('show');
+  }
+  if(!valid) return;
+
+  customerName    = nameVal;
+  deliveryAddress = addrVal;
+  localStorage.setItem(NAME_KEY,  nameVal);
+  localStorage.setItem(ADDR_KEY,  addrVal);
   updateNavAddress();
   closeAddrModal();
 }
@@ -1357,15 +1383,17 @@ function updateNavAddress(){
   }
 }
 
-// On page load — check localStorage for saved address
+// On page load — restore name + address from localStorage
 (function initAddress(){
-  const saved = localStorage.getItem(ADDR_KEY);
-  if(saved && saved.trim().length >= 5){
-    deliveryAddress = saved.trim();
+  const savedName = localStorage.getItem(NAME_KEY);
+  const savedAddr = localStorage.getItem(ADDR_KEY);
+  if(savedName && savedAddr && savedAddr.trim().length >= 5){
+    customerName    = savedName.trim();
+    deliveryAddress = savedAddr.trim();
     updateNavAddress();
-    // Address already set — don't show modal
+    // Both set — don't show modal
   } else {
-    // No address found — show modal after short delay for page to settle
+    // Missing info — show modal after short delay for page to settle
     setTimeout(() => openAddrModal(), 600);
   }
 })();
@@ -1527,6 +1555,7 @@ function quickOrder(e, name, price){
   const msg =
 `*🍔 NEW ORDER RECEIVED VIA URBANBITES*
 ----------------------------------------
+👤 *CUSTOMER NAME:* ${customerName}
 📍 *DELIVERY ADDRESS:* ${deliveryAddress}
 ----------------------------------------
 *ITEMS ORDERED:*
@@ -1554,6 +1583,7 @@ function placeOrder(){
   const msg =
 `*🍔 NEW ORDER RECEIVED VIA URBANBITES*
 ----------------------------------------
+👤 *CUSTOMER NAME:* ${customerName}
 📍 *DELIVERY ADDRESS:* ${deliveryAddress}
 ----------------------------------------
 *ITEMS ORDERED:*
