@@ -1363,4 +1363,218 @@ function updateNavAddress(){
   if(saved && saved.trim().length >= 5){
     deliveryAddress = saved.trim();
     updateNavAddress();
-    // Ad
+    // Address already set — don't show modal
+  } else {
+    // No address found — show modal after short delay for page to settle
+    setTimeout(() => openAddrModal(), 600);
+  }
+})();
+
+/* ── Nav ── */
+const hamBtn = document.getElementById('hamBtn');
+const mobMenu = document.getElementById('mobMenu');
+hamBtn.addEventListener('click', () => mobMenu.classList.toggle('open'));
+function closeMob(){ mobMenu.classList.remove('open') }
+document.addEventListener('click', e => {
+  if(!hamBtn.contains(e.target) && !mobMenu.contains(e.target)) closeMob();
+});
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('solid', window.scrollY > 50);
+}, {passive:true});
+
+/* ── Category filter ── */
+function filterCat(btn, cat){
+  document.querySelectorAll('.ct').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.mcard').forEach(c => {
+    const show = cat === 'all' || c.dataset.cat === cat;
+    c.style.display = show ? 'flex' : 'none';
+    if(show){ c.style.animation='none'; void c.offsetWidth; c.style.animation='cardIn .3s ease both' }
+  });
+}
+
+/* ── Add to Cart ── */
+function addToCart(btn){
+  const card = btn.closest('.mcard');
+  const {id, name, price, img} = card.dataset;
+  const p = parseFloat(price);
+
+  flyDot(btn);
+
+  cart[id] ? cart[id].qty++ : (cart[id] = {name, price:p, img, qty:1});
+
+  // button feedback
+  btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Added!</span>`;
+  btn.classList.add('added');
+  setTimeout(() => {
+    btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Add to Cart</span>`;
+    btn.classList.remove('added');
+  }, 1600);
+
+  refreshUI();
+}
+
+/* ── Flying dot ── */
+function flyDot(btn){
+  const cBtn = document.getElementById('cartBtn');
+  const bR = btn.getBoundingClientRect();
+  const cR = cBtn.getBoundingClientRect();
+  const dot = document.createElement('div');
+  dot.className = 'fly-dot';
+  dot.style.cssText = `left:${bR.left+bR.width/2-4.5}px;top:${bR.top+bR.height/2-4.5}px`;
+  document.body.appendChild(dot);
+  requestAnimationFrame(() => {
+    dot.style.transition = 'left .5s cubic-bezier(.4,0,.2,1),top .5s cubic-bezier(.4,0,.2,1),opacity .18s .38s,transform .5s';
+    dot.style.left = `${cR.left+cR.width/2-4.5}px`;
+    dot.style.top  = `${cR.top+cR.height/2-4.5}px`;
+    dot.style.opacity = '0';
+    dot.style.transform = 'scale(.2)';
+  });
+  setTimeout(() => {
+    document.getElementById('cartBadge').classList.add('bump');
+    setTimeout(() => document.getElementById('cartBadge').classList.remove('bump'), 350);
+    dot.remove();
+  }, 520);
+}
+
+/* ── Refresh UI ── */
+function refreshUI(){
+  const vals = Object.values(cart);
+  const count = vals.reduce((s,i) => s+i.qty, 0);
+  const total = vals.reduce((s,i) => s+i.price*i.qty, 0);
+
+  // badge
+  const badge = document.getElementById('cartBadge');
+  badge.textContent = count;
+  badge.classList.toggle('on', count > 0);
+
+  // totals
+  document.getElementById('drTotal').textContent = total.toFixed(2);
+  document.getElementById('sbTotal').textContent = total.toFixed(2);
+  document.getElementById('sbCount').textContent = count === 1 ? '1 item in your order' : `${count} items in your order`;
+
+  // sticky bar
+  document.getElementById('stickyBar').classList.toggle('show', count > 0);
+
+  // footer
+  document.getElementById('drFt').style.display = count > 0 ? 'flex' : 'none';
+
+  renderItems();
+}
+
+/* ── Render cart items ── */
+function renderItems(){
+  const body = document.getElementById('drBody');
+  const empty = document.getElementById('drEmpty');
+  const entries = Object.entries(cart);
+
+  if(!entries.length){
+    empty.style.display = 'flex';
+    body.querySelectorAll('.ci').forEach(r => r.remove());
+    return;
+  }
+  empty.style.display = 'none';
+
+  entries.forEach(([id, item]) => {
+    let row = document.getElementById('ci_'+id);
+    if(!row){ row = document.createElement('div'); row.className='ci'; row.id='ci_'+id; body.appendChild(row); }
+    row.innerHTML = `
+      <div class="ci-thumb"><img src="${item.img}" alt="${item.name}" style="width:48px;height:48px;object-fit:cover;border-radius:7px"/></div>
+      <div class="ci-inf">
+        <div class="ci-n">${item.name}</div>
+        <div class="ci-p">£${(item.price*item.qty).toFixed(2)}</div>
+      </div>
+      <div class="ci-qty">
+        <button onclick="chQty('${id}',-1)">−</button>
+        <span class="qn">${item.qty}</span>
+        <button onclick="chQty('${id}',1)">+</button>
+      </div>`;
+  });
+
+  body.querySelectorAll('.ci').forEach(row => {
+    if(!cart[row.id.replace('ci_','')]) row.remove();
+  });
+}
+
+function chQty(id, d){
+  if(!cart[id]) return;
+  cart[id].qty += d;
+  if(cart[id].qty <= 0) delete cart[id];
+  refreshUI();
+}
+
+function clearCart(){ cart = {}; refreshUI(); }
+
+/* ── Drawer ── */
+function openCart(){
+  document.getElementById('overlay').classList.add('on');
+  document.getElementById('drawer').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+function closeCart(){
+  document.getElementById('overlay').classList.remove('on');
+  document.getElementById('drawer').classList.remove('on');
+  document.body.style.overflow = '';
+}
+
+/* ── Quick Order (single item via WhatsApp) ── */
+function quickOrder(e, name, price){
+  e.preventDefault();
+  if(!deliveryAddress){
+    openAddrModal();
+    return;
+  }
+  const msg =
+`*🍔 NEW ORDER RECEIVED VIA URBANBITES*
+----------------------------------------
+📍 *DELIVERY ADDRESS:* ${deliveryAddress}
+----------------------------------------
+*ITEMS ORDERED:*
+- 1x ${name} (£${price})
+
+*Total Amount:* £${price}
+----------------------------------------`;
+  window.open(`https://api.whatsapp.com/send?phone=923472619993&text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+}
+
+/* ── Place Order ── */
+function placeOrder(){
+  const items = Object.values(cart);
+  if(!items.length) return;
+
+  // If no address saved, prompt user first
+  if(!deliveryAddress){
+    openAddrModal();
+    return;
+  }
+
+  const total = items.reduce((s,i) => s+i.price*i.qty, 0);
+  const lines = items.map(i => `- ${i.qty}x ${i.name} (£${(i.price).toFixed(2)})`).join('\n');
+
+  const msg =
+`*🍔 NEW ORDER RECEIVED VIA URBANBITES*
+----------------------------------------
+📍 *DELIVERY ADDRESS:* ${deliveryAddress}
+----------------------------------------
+*ITEMS ORDERED:*
+${lines}
+
+*Total Amount:* £${total.toFixed(2)}
+----------------------------------------`;
+
+  window.open(`https://api.whatsapp.com/send?phone=923472619993&text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+}
+
+/* ── Scroll reveal ── */
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if(e.isIntersecting){
+      setTimeout(() => e.target.classList.add('in'), i * 65);
+      obs.unobserve(e.target);
+    }
+  });
+}, {threshold:.08});
+document.querySelectorAll('.r').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
